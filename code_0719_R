@@ -1,0 +1,276 @@
+
+## install.packages("NMOF")
+library("NMOF")
+library(WindR)
+w.start()
+setwd("D:/csv_data");                          ## 设置工作环境
+option_data <- read.table("20150715option查询csv.csv",sep=",",header=T);   ## 读取csv数据
+stock_data <- read.table("stock20150715csv.csv",sep=",",header=T);
+
+scale_num = 10000
+
+
+##### vol calculation ###########
+start.date <- "2015-01-01"
+end.date <- Sys.Date()
+SpotPrice <- w.wsd("510050.SH","close", start.date, end.date, "Fill=Previous;PriceAdj=B")$Data$CLOSE
+Tdiff <- difftime(end.date, start.date, units = 'days')
+Tdiff <- as.numeric(Tdiff)
+vol <- sd(SpotPrice) * sqrt(365/Tdiff)
+
+##### other parameters
+r <- 0.04; q <- 0.03; 
+S <- w.wsq("510050.SH","rt_last")$Data$RT_LAST #Spot
+
+#####   获取所有期权列表 
+date <- Sys.Date()
+sdate <- paste(substr(date, 1, 4), substr(date, 6, 7), substr(date, 9, 10), sep = '')
+AllOptionData <- w.wset('OptionChain',paste('date=', sdate, ';us_code=510050.SH;option_var=510050OP;month=全部;call_put=全部', sep = ''))$Data
+colnames(AllOptionData)
+
+
+#### option data  initializing #############
+
+option_length <- length(option_data$成交日期);
+
+option.code <- option_data$合约代码;
+option.code <- unique(option.code);         ##获取合约代码集合
+option_num <- length(option.code);
+
+option.pnl <- init_array(c(1:option_num));
+option.Total <- init_array(c(1:option_num));
+
+curr_pos <- init_array(c(1:option_num));              ## 初始化option pos,pnl,closePrice, total
+curr_close <- init_array(c(1:option_num));
+prePos_data <-init_array(c(1:option_num));
+preClose_data <- init_array(c(1:option_num));
+###### option  PnL #############
+
+
+trading_date = option_data$成交日期
+trading_date = unique(trading_date)  ##日期去重复
+
+## 定义全局DataFrame记录每个合约position，和accumulative pnl
+
+sum_frame <- data.frame(date = trading_date);
+
+for(date_tmp in trading_date){
+  ## 定义每天的 DataFrame
+  frame_option <- data.frame(code = option.code, position = curr_pos, PnL = option.pnl, 
+                             Close =curr_close,Daily_Total_PnL = option.Total,
+                             PrePos = prePos_data, PreClose = preClose_data);
+  ## 
+  #for(i in c(1:length(frame_option))){
+  #  frame_option[i,6]=pre_data[i];   ## 记录今天pos作为下一天的PrePos
+  #}
+  
+  
+  for (i in c(1:option_length)){
+    cur_date = option_data$成交日期[i];
+    cur_code = option_data$合约代码[i];
+    code_counter = 0;
+    if(cur_date == date_tmp){
+      for (code_tmp in option.code){
+        code_counter = code_counter+1;
+        if (code_tmp == cur_code){        ##日期和代码均匹配
+          
+          multiplier = -1;
+          trade_type <- option_data$业务类别[i];
+          if(trade_type == '卖出开仓')
+          {multiplier = 1;}
+          vol_trade = option_data$成交数量[i];
+          cash_trade = vol_trade*option_data$成交价格[i];
+          # 计算pnl
+          frame_option[code_counter,3] = frame_option[code_counter,3] + multiplier*cash_trade*scale_num;
+          frame_option[code_counter,3] = frame_option[code_counter,3] - 1*vol_trade;
+          # 记录position
+          curr_pos[code_counter] = curr_pos[code_counter] - multiplier*vol_trade; 
+          frame_option[code_counter,2] = curr_pos[code_counter];
+
+        }
+      }
+    }
+  }
+  
+  
+
+  ## 更新 pre_data
+  for(i in c(1:length(frame_option))){
+    prePos_data[i]= curr_pos[i];   ## 记录今天pos作为下一天的PrePos
+  }
+  
+  
+  
+  ## 按收盘和持仓价结算净收益
+  code_counter = 0;
+  total_pnl = 0;
+  for (code_tmp in option.code){
+    code_counter = code_counter+1;
+    ## 读取code_tmp 的收盘价
+    close_data <- w.wss(paste(code_tmp,'.SH',sep = ""),'close', paste("tradeDate=",date_tmp,sep=""),
+                        'priceAdj=F','cycle=D');
+    close_data <- close_data$Data;
+    closePrice <- close_data[1,2]*scale_num;
+    curr_close[code_counter] = closePrice;
+    frame_option[code_counter,4] = curr_close[code_counter];
+    
+    ## 结算收益
+    frame_option[code_counter,3] = frame_option[code_counter,3] + closePrice*frame_option[code_counter,2];
+    frame_option[code_counter,3] = frame_option[code_counter,3] - preClose_data[code_counter]*frame_option[code_counter,5]
+    total_pnl = total_pnl + frame_option[code_counter,3];
+  }
+  
+  ## 更新 preClose
+  for(i in c(1:length(frame_option))){
+    preClose_data[i] = curr_close[i];
+  }
+  
+  
+  ### 写入当日总盈亏
+  
+  frame_option[1,5] = total_pnl;
+  
+  
+  frame_write = frame_option;
+  ## 清除frame_write中没有交易记录的行
+  #for (i in c(1:length(frame_write))){
+  #  if (abs(frame_write[i,3]) < 1){
+  #    frame_write = frame_write[-i,];        ## 删除该行
+  #    i = i-1;
+  #  }
+  #}
+  frame_write = frame_write[,-6]
+  frame_write = frame_write[,-6]
+  
+  ## 输出每日结果
+  file_name = paste("option_pnl_",date_tmp,".csv", sep = "");
+  write.csv(frame_write ,file = file_name);
+  
+  
+}
+
+
+
+
+
+####  stock data initializing  #####
+stock_length <- length(stock_data$成交日期);
+
+stock.code <- stock_data$证券代码;
+stock.code <- unique(stock.code);         ##获取证券代码集合
+stock_num <- length(stock.code);
+
+stock.pos <- init_array(c(1:stock_num));              ## 初始化option pos,pnl,closePrice, total
+stock.pnl <- init_array(c(1:stock_num));
+stock.close <- init_array(c(1:stock_num));
+stock.Total <- init_array(c(1:stock_num));
+
+#### stock PnL    ##########
+
+trading_date = stock_data$成交日期
+trading_date = unique(trading_date)  ##日期去重复
+
+for(date_tmp in trading_date){
+  ## 定义每天的 DataFrame
+  frame_stock <- data.frame(code = stock.code, position = stock.pos, PnL = stock.pnl, 
+                             Close =stock.close,Daily_Total_PnL = stock.Total);
+  for (i in c(1:stock_length)){
+    cur_date = stock_data$成交日期[i];
+    cur_code = stock_data$证券代码[i];
+    code_counter = 0;
+    if(cur_date == date_tmp){
+      for (code_tmp in stock.code){
+        code_counter = code_counter+1;
+        if (code_tmp == cur_code){        ##日期和代码均匹配
+          vol_trade = option_data$成交数量[i];
+          cash_trade = vol_trade*(option_data$成交价格[i]);
+          frame_option[code_counter,3] = frame_option[code_counter,3] - cash_trade;   # 记录pnl
+          frame_option[code_counter,2] = frame_option[code_counter,2] + vol_trade;    # 记录position
+          
+        }
+      }
+    }
+  }
+  
+  ## 按收盘和持仓价结算净收益
+  code_counter = 0;
+  total_pnl = 0;
+  for (code_tmp in stock.code){
+    code_counter = code_counter+1;
+    ## 读取code_tmp 的收盘价
+    close_data <- w.wss(paste(code_tmp,'.SH',sep = ""),'close', paste("tradeDate=",date_tmp,sep=""),
+                        'priceAdj=F','cycle=D');
+    close_data <- close_data$Data;
+    closePrice <- close_data[1,2];
+    frame_stock[code_counter,4] = closePrice;
+    ## 结算收益
+    frame_stock[code_counter,3] = frame_stock[code_counter,3] + closePrice*frame_stock[code_counter,2];  
+    total_pnl = total_pnl + frame_stock[code_counter,3];
+  }
+  ### 写入当日总盈亏
+  
+  frame_stock[1,5] = total_pnl;
+  
+  
+  ##
+  
+  ## 输出每日结果
+  file_name = paste("stock_pnl_",date_tmp,".csv", sep = "");
+  write.csv(frame_stock ,file = file_name);
+
+
+}
+
+
+
+########################
+
+
+##### greeks ############
+
+greeks.table <- NULL
+
+for(i in 1: length(option.code))
+{
+  code <- paste(option.code[i], '.SH', sep= '')
+  X <- AllOptionData[AllOptionData$option_code == code, 'strike_price']
+  last_tradedate <- w.asDateTime( AllOptionData[AllOptionData$option_code == code, 'last_tradedate']) 
+  month <- AllOptionData[AllOptionData$option_code == code, 'month']
+  tau <- as.numeric(difftime(last_tradedate, date, units = "days") + 15/24) / 365
+  call_put <- AllOptionData[AllOptionData$option_code == code, 'call_put']
+  type <- ifelse(call_put == "认购", 'call', 'put')
+  greeks.value <- round(unlist(vanillaOptionEuropean(S, X, tau, r, q, vol^2, type = type)), 4)
+  
+  #greeks.value <- as.data.frame(greeks.value)
+  row <- data.frame(code = code, strike = X, month = month, type = type , 
+                    value = greeks.value[1],
+                    delta = greeks.value[2],
+                    gamma = greeks.value[3],
+                    theta = greeks.value[4],
+                    vega = greeks.value[5],
+                    rho = greeks.value[6],
+                    pos = option.pos[i]
+  )
+  
+  greeks.table <- rbind(greeks.table, row)
+  
+}
+
+rownames(greeks.table) <- 1 : length(option.code)
+
+
+
+###########  function ##############
+
+init_array <- function(x)
+{
+  n = length(x);
+  y = x;
+  for(i in c(1:n)){
+    y[i] = 0;
+  }
+  return (y);
+}
+
+'This is the end'
+
