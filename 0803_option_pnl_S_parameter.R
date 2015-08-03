@@ -10,6 +10,7 @@
 ##    ·自动读取合约名称
 ##    ·连接sumnmary
 ##    ·修正parameter:S in Greeks.value
+##    ·修复curr_close为NA的bug
 ## 
 ##########################################
 
@@ -271,6 +272,7 @@ for(date_tmp in trading_date){
     
     close_data <- close_data$Data;
     closePrice <- close_data[1,2]*scale_num;
+    if(is.na(closePrice)) {closePrice = frame_option[code_counter,7]}
     curr_close[code_counter] = closePrice;
     frame_option[code_counter,4] = curr_close[code_counter];
     
@@ -278,6 +280,8 @@ for(date_tmp in trading_date){
     frame_option[code_counter,3] = frame_option[code_counter,3] + frame_option[code_counter,4]*frame_option[code_counter,2];
     
     frame_option[code_counter,3] = frame_option[code_counter,3] - frame_option[code_counter,7]*frame_option[code_counter,6]
+    
+    #if (is.na(frame_option[code_counter,3])) {frame_option[code_counter,3] = 0}
     
     total_pnl = total_pnl + frame_option[code_counter,3];
   }
@@ -389,7 +393,7 @@ for(date_tmp in trading_date){
     price <- close_vol[1,2];
     impVol_tmp = 0
     #impVol_tmp <- vanillaOptionImpliedVol(exercise = "european", price,S,X,tau,r,q=0,
-    #                                      tauD=0,D=0,type="call",M=101,uniroot.control=list())
+    #                                      tauD=0,D=0,type="call",M=101,uniroot.control=list(), uniroot.info = FALSE)
     
     ## Greeks 写入 frame_option ####
     
@@ -418,7 +422,7 @@ for(date_tmp in trading_date){
   delete_num = c(1:ori_len);
   
   for (i in c(1:ori_len)){
-    if (frame_write[i,3] == 0){
+    if (frame_write[i,3] == 0 || is.na(frame_write[i,3])){
       delete_num[i] = 0;    }
   }
   
@@ -435,10 +439,11 @@ for(date_tmp in trading_date){
   }
   
   ## 计算Sum_Greeks
-  sum_greeks = c(NA,NA,NA,NA,NA,NA,NA,0,0,0,0,0,0)
+  sum_greeks = c(NA,NA,NA,NA,NA,NA,NA,0,0,0,0,0,0,NA,0)
   for (greek_num in c(8:13)){
     sum_greeks[greek_num] =sum(frame_write[,greek_num])
   }
+  sum_greeks[15] = sum (frame_write[,15])
   
   frame_write = rbind(frame_write, sum_greeks)
   
@@ -449,7 +454,7 @@ for(date_tmp in trading_date){
   # frame_write = frame_write[,-6];
   rownames(frame_write) = 1: nrow(frame_write)
   file_name_tmp = paste("option_pnl_",date_tmp,".csv", sep = "")
-  write.csv(frame_write ,file = file_name_tmp)
+  write.csv(frame_option ,file = file_name_tmp)
   
   
   
