@@ -1,0 +1,56 @@
+Dim n As Integer
+Dim i As Integer
+
+Private Sub Start_Click()
+    
+    Set ws1 = ThisWorkbook.Worksheets("WOP")
+    With ws1
+        If (.Cells(1, 10) >= 0) Then
+            .Cells(1, 10) = .Cells(1, 10) + 1
+        Else
+            .Cells(1, 10) = "No a number"
+        End If
+        
+        
+        '读取行数
+        n = ActiveSheet.Cells(65536, 2).End(xlUp).Row
+        
+
+        For i = 5 To n
+            'RTD("WDF.RTQ",,B5,"Bid_Price1")
+            
+            '认购期权
+            
+            .Cells(i, 4) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Volume"")"       '5D 成交量
+            .Cells(i, 5) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Bid_Price1"")"  '5E 买一价
+            .Cells(i, 6) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Ask_Price1"")"    ' 卖一价
+            .Cells(i, 7) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Bid_Volume1"")"
+            .Cells(i, 8) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Ask_Volume1"")"
+            .Cells(i, 9) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""ImpliedVol"")"
+            .Cells(i, 11) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Delta"")"
+            .Cells(i, 12) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Gamma"")"
+            .Cells(i, 13) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Vega"")"
+            .Cells(i, 14) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Theta"")"
+            .Cells(i, 15) = "=" & "RTD(""WDF.RTQ"",,B" & i & ",""Rho"")"
+            
+            '认沽期权
+            .Cells(i, 21) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Volume"")"
+            .Cells(i, 22) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Bid_Price1"")"
+            .Cells(i, 23) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Ask_Price1"")"
+            .Cells(i, 24) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Bid_Volume1"")"
+            .Cells(i, 25) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Ask_Volume1"")"
+            .Cells(i, 26) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""ImpliedVol"")"
+            .Cells(i, 28) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Delta"")"
+            .Cells(i, 29) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Gamma"")"
+            .Cells(i, 30) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Vega"")"
+            .Cells(i, 31) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Theta"")"
+            .Cells(i, 32) = "=" & "RTD(""WDF.RTQ"",,S" & i & ",""Rho"")"
+            
+            
+            
+        Next i
+        
+        
+    End With
+    
+End Sub
