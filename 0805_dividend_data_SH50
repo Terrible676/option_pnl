@@ -1,0 +1,25 @@
+library(WindR);
+w.start();
+SZ50_data<-w.wset('SectorConstituent','date=20150805;windcode=000016.SH');
+code_50 <- SZ50_data$Data$wind_code;
+
+code_str <- code_50[1]
+for (i in 2:length(code_50)){
+  code_str <- paste(code_str,code_50[i],sep=",")
+}
+
+
+
+field_str  = 'field=ex_dividend_date,wind_code,sec_name,stock_split_ratio,ex_dividend_note'
+start_str <- 'startdate = 20100805';
+end_str <- 'enddate=20150805';
+windcode_str <- paste('windcode=',code_str,sep="");
+query_str <- paste(start_str,end_str,windcode_str,field_str,sep=';');
+dividend_data <- w.wset('CorporationAction',query_str);
+
+setwd('D:/yisheng/SZ50_dividend');
+filename <- 'dividend_data_0805.csv';
+write.csv(dividend_data, file = filename);
+  
+#w.wset('CorporationAction','startdate=20100805;enddate=20150805;windcode=600519.SH;
+#             field=ex_dividend_date,wind_code,sec_name,stock_split_ratio,ex_dividend_note')
